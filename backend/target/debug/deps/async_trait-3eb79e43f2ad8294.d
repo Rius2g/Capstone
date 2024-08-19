@@ -1,0 +1,12 @@
+/Users/riius/capstone/backend/target/debug/deps/libasync_trait-3eb79e43f2ad8294.dylib: /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/lib.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/args.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/bound.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/expand.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/lifetime.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/parse.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/receiver.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/verbatim.rs
+
+/Users/riius/capstone/backend/target/debug/deps/async_trait-3eb79e43f2ad8294.d: /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/lib.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/args.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/bound.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/expand.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/lifetime.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/parse.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/receiver.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/verbatim.rs
+
+/Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/lib.rs:
+/Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/args.rs:
+/Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/bound.rs:
+/Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/expand.rs:
+/Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/lifetime.rs:
+/Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/parse.rs:
+/Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/receiver.rs:
+/Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/async-trait-0.1.81/src/verbatim.rs:

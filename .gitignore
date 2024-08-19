@@ -1,0 +1,66 @@
+# Node modules and other npm-related files
+node_modules/
+package-lock.json
+yarn.lock
+.pnp.*
+.pnp.js
+
+# Typescript build artifacts
+*.tsbuildinfo
+
+# Rust build artifacts
+/target/
+Cargo.lock
+
+# MacOS
+.DS_Store
+
+# Linux
+*~
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+
+# Log files
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Compiled files
+*.out
+*.exe
+*.dll
+*.so
+*.dylib
+
+# React build outputs
+build/
+dist/
+
+# Coverage reports
+coverage/
+
+# Miscellaneous
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+
+# Rust-specific
+Cargo.toml.lock
+

@@ -1,0 +1,11 @@
+/Users/riius/capstone/backend/target/debug/deps/futures_channel-7c5c3ce6b40785d7.rmeta: /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/lib.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/lock.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/mpsc/mod.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/mpsc/queue.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/oneshot.rs
+
+/Users/riius/capstone/backend/target/debug/deps/libfutures_channel-7c5c3ce6b40785d7.rlib: /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/lib.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/lock.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/mpsc/mod.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/mpsc/queue.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/oneshot.rs
+
+/Users/riius/capstone/backend/target/debug/deps/futures_channel-7c5c3ce6b40785d7.d: /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/lib.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/lock.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/mpsc/mod.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/mpsc/queue.rs /Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/oneshot.rs
+
+/Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/lib.rs:
+/Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/lock.rs:
+/Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/mpsc/mod.rs:
+/Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/mpsc/queue.rs:
+/Users/riius/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-channel-0.3.30/src/oneshot.rs:
