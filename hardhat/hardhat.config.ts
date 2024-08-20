@@ -1,21 +1,16 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
+import * as dotenv from "dotenv";
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.24",
-};
-require('@nomiclabs/hardhat-waffle');
-require('dotenv').config();
-
-module.exports = {
-  solidity: "0.8.18",
+  solidity: "0.8.19",
   networks: {
     fuji: {
-      url: 'https://api.avax-test.network/ext/bc/C/rpc',
-      accounts: [process.env.PRIVATE_KEY] // Load private key from .env file
+      url: "https://api.avax-test.network/ext/bc/C/rpc",
+      chainId: 43113,
+    accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : []
     }
   }
 };
-
 
 export default config;
