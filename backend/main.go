@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
-
+    "fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
@@ -42,6 +42,21 @@ func getChainID(c *gin.Context){
     }
 
     c.JSON(http.StatusOK, gin.H{"chainID": chainID.String()})
+}
+
+
+func postToChain(c *gin.Context){
+    //get the data from the request and post to chain 
+
+    encryptedData := c.PostForm("data")
+    releaseTime := c.PostForm("releaseTime")
+    decryptionKey := c.PostForm("decryptionKey")
+    owner := c.PostForm("owner")
+
+    fmt.Println(encryptedData, releaseTime, decryptionKey, owner)
+    // Post the data to the postToChain
+
+    c.JSON(http.StatusOK, gin.H{"message": "Post to chain"})
 }
 
 
