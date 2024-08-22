@@ -1,14 +1,34 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
-    "fmt"
-	"github.com/gin-gonic/gin"
+
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/gin-gonic/gin"
+    "github.com/ethereum/go-ethereum/accounts/abi"
+    "strings"
+    
 )
 
+
+const (
+    infuraURL       = "https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID"
+    contractAddress  = "0xYourContractAddress"
+    contractABI      = `[{"constant":true,"inputs":[],"name":"getValue","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"}]`
+)
+
+type Contract struct {
+    contract abi.ABI 
+    address common.Address
+    client *ethclient.Client
+}
+
+
 var client *ethclient.Client
+var contractInstance *Contract
 func main() {
 	// Connect to an Avalanche node
     var err error
@@ -17,19 +37,33 @@ func main() {
 		log.Fatal(err)
 	}
 
+
+    parsedABI, err := abi.JSON(strings.NewReader(contractABI))
+    if err != nil {
+        log.Fatalf("Failed to parse contract ABI: %v", err)
+    }
+
+    contractAddress := common.HexToAddress(contractAddress)
+
+    contractInstance = &Contract{contract: parsedABI, address: contractAddress, client: client}
+
+
 	// Create a new Gin router
-	r := gin.Default()
+    startServer()
+}
+
+func startServer(){
+    // Create a new Gin router
+    r := gin.Default()
 
     r.GET("/chainID", getChainID)
     r.GET("/blockNumber", getBlockNumber)
 
+    r.POST("/postToChain", postToChain)
+    r.GET("/getFromChain", getFromChain)
 
-	// Define a route to get the latest block number
-
-	// Define a route to get the chain ID
-
-	// Run the server
-	r.Run(":8080")
+    // Run the server
+    r.Run(":8080")
 }
 
 
@@ -42,6 +76,10 @@ func getChainID(c *gin.Context){
     }
 
     c.JSON(http.StatusOK, gin.H{"chainID": chainID.String()})
+}
+
+
+func getFromChain(c *gin.Context){
 }
 
 
