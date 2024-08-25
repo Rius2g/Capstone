@@ -9,9 +9,9 @@ contract TwoPhaseCommit is AutomationCompatibleInterface {
     struct StoredData {
         string encryptedData;
         string decryptionKey; 
-        string[] interestedParties;
         string owner;
-        int phase; //0: data stored, 1: data is sent, 2: all willing have acked encrypted data 3: decryption key is sent
+        string dataName;
+        int phase; //0: data stored, 1: data is sent, 2: decryption key is sent
         int ackCount;
         uint256 releaseTime;
     }
@@ -35,8 +35,20 @@ contract TwoPhaseCommit is AutomationCompatibleInterface {
         uint256 currentTimestamp = getLatestTimestamp();
         if ((currentTimestamp - lastExecutionTime) > interval) {
             lastExecutionTime = currentTimestamp;
-            // Perform your time-based action here
-            sendEncryptedData(); // Calling the function
+            for (uint i = 0; i < storedData.length; i++) {
+                if (storedData[i].phase == 0) {
+                    if (currentTimestamp - 43200 > storedData[i].releaseTime) {
+                    sendEncryptedData(i); // Calling the function            
+                    storedData[i].phase = 1;
+                    }
+                }
+                else if(storedData[i].phase == 1) {
+                    if (currentTimestamp >= storedData[i].releaseTime) {
+                    sendDecryptionKey(i); // Calling the function
+                    storedData[i].phase = 2;
+                    }
+                }
+            }
         }
     }
 
@@ -51,11 +63,23 @@ contract TwoPhaseCommit is AutomationCompatibleInterface {
         return timeStamp;
     }
 
-    function addStoredData(string memory _encryptedData, string memory _decryptionKey, string memory _owner, string[] memory _interestedParties, uint256 _releaseTime) public {
-        storedData.push(StoredData(_encryptedData, _decryptionKey, _interestedParties, _owner, 0, 0, _releaseTime));
+    function addStoredData(string memory _encryptedData, string memory _decryptionKey, string memory _owner, string memory _dataName, uint256 _releaseTime) public {
+        storedData.push(StoredData(_encryptedData, _decryptionKey, _owner, _dataName, 0, 0, _releaseTime));
     }
 
-    function sendEncryptedData() public {
+
+    function returnStoredData() public view returns (StoredData[] memory){
+        return storedData;
+    }
+
+    function sendEncryptedData(uint256 index) public view returns (string memory) {
         // Implementation
+        //how to make the data public? How to expose the data to the public? How to hide the data from the public before this point?
+        return storedData[index].encryptedData;
+    }
+
+    function sendDecryptionKey(uint256 index) public view returns (string memory) {
+        // Implementation
+        return storedData[index].decryptionKey;
     }
 }

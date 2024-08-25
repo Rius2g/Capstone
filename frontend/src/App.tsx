@@ -1,11 +1,12 @@
-import React from 'react';
-import logo from './logo.svg';
 import './App.css';
+import {MainPage} from  "./MainPage";
+import {Header} from "./Header";
 
 function App() {
   return (
     <div className="App">
-   <h1> Heia lyn </h1>
+    <Header />
+    <MainPage />
    </div>
   );
 }
