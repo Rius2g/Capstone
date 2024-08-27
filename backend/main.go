@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -87,9 +88,6 @@ func StartChordHandler(c *gin.Context) {
 	self.ChordSize = (1 << keySize)
 	self = chord.CreateChord(self)
 	c.String(http.StatusOK, fmt.Sprintf("Chord of size %d created by node %d.\n", self.ChordSize, self.Id))
-}
-
-func FindNodeId(c *gin.Context) {
 }
 
 func main() {
@@ -315,6 +313,17 @@ func NodeJoin(c *gin.Context) {
 }
 
 /*
+* Function to handle the /neighbors GET request
+* @param c is the context of the get request.
+* @returns: Responds to the request
+ */
+func GetNeighborHandler(c *gin.Context) {
+	neighbors := chord.FindNeighbors(self)
+	//response := h.VerifyNeighbors{Self: self.Id, Neighbours: neighbors}
+	c.JSON(http.StatusOK, neighbors)
+}
+
+/*
 * Return the chord size to the new node in the chord for it to hash with
  */
 func getInfo(c *gin.Context) {
@@ -322,6 +331,207 @@ func getInfo(c *gin.Context) {
 
 	log.Printf("sending info from %d\n", self.Id)
 	c.String(http.StatusOK, strconv.Itoa(self.ChordSize))
+}
+
+/*
+// Function to handle a simulated node crash
+// @param c is the context of the get request.
+// @returns: Responds to the request
+*/
+func NodeCrash(c *gin.Context) { //crash the node
+	c.String(http.StatusOK, "Node %d Crashed. My Chordsize was: %d\n", self.Id, self.ChordSize)
+}
+
+/*
+* Function to balance the chord network again
+* @param c is the context of the get request.
+* @returns: Responds to the request
+ */
+func BalanceChord(c *gin.Context) {
+	//read nodeLoc body, if same id as us, we stop as we are around the circle
+	//if not us, we check finder table if we are more appropriate value in it and send forward.
+	//more appropriate if this node id is >= the key but < the current entry
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.String(http.StatusConflict, "Cant read body here :(")
+		return
+	}
+
+	var updatedNode h.Node
+	if err := json.Unmarshal(body, &updatedNode); err != nil {
+		c.String(http.StatusConflict, "Can't parse JSON body :(")
+		return
+	}
+	if updatedNode.Id != self.Id {
+		go chord.UpdateFingertableOnJoin(updatedNode, self)
+	} else {
+		c.String(http.StatusOK, "")
+		return
+	}
+}
+
+/*
+* Function to handle a node recover
+* @param c is the context of the get request.
+* @returns: Responds to the request
+ */
+func NodeRecover(c *gin.Context) {
+
+	if self.ChordSize == 0 { //this means not in chord anymore we should request to rejoin
+		//we send a rejoin request
+		url := "http://" + self.FingerTable[0].NodeAddress + "/rejoin-request"
+		body := strings.NewReader(self.Address)
+		_, err := http.Post(url, "text/plain", body) //send our address to the node we want to request our rejoin
+		if err != nil {
+			h.HandleError(err, "Error on post request.", false)
+		}
+
+	}
+	c.String(200, "OK")
+
+}
+
+func RejoinChord(c *gin.Context) {
+	//we send join to the node that sent us this request with our ip:port
+	body := c.Request.Body
+	newNode, err := io.ReadAll(body)
+	url := "http://" + string(newNode) + "/join?nprime=" + self.Address
+	_, err = http.Post(url, "text/plain", nil)
+	if err != nil {
+		h.HandleError(err, "Error on post request.", false)
+	}
+	c.String(200, "OK")
+
+}
+
+/*
+* Endpoint to handle finding appropriate node for a key in the chord
+ */
+func FindNodeId(c *gin.Context) {
+	nodeId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		h.HandleError(err, "Could not convert id\n", false)
+	}
+
+	resultChan := make(chan h.Node)
+	defer close(resultChan)
+
+	go chord.FindNodeId(nodeId, self, resultChan)
+	value := <-resultChan
+	c.JSON(http.StatusOK, value)
+}
+
+/*
+* This API is called after a node has joined the network.
+* This is receive by the succsessor of the new node.
+* Receive its previous node and update its own previous node.
+ */
+func UpdatePreviousOnsuccsessor(c *gin.Context) {
+	//we send the nodes h.Nodeloc in here
+	//we send this nodes H.nodeToloc back and update to new previous
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		h.HandleError(err, "Can't read body", false)
+	}
+
+	var previous h.Node
+	err = json.Unmarshal(body, &previous)
+	if err != nil {
+		h.HandleError(err, "Can't unmarshal body", false)
+	}
+
+	prev := self.Neighbours.Predecessor
+	if prev.Id == -1 { //empty entry we add ourselves to send
+		prev.Id = self.Id
+		prev.Address = self.Address
+	}
+	self.Neighbours.Predecessor = &previous
+
+	c.JSON(http.StatusOK, prev)
+}
+
+/*
+* This API is called after removing all nodes have removed the leaving node from their finger tables.
+* This will fill finger table and send the api forward in the chord
+* When the api reaches the node that started it, it will exit.
+ */
+func FillFingerTable(c *gin.Context) { //done filling finger table
+	//need a api to call when we want to fill empty entries in the finger table
+	//needs a way to know when we are done filling the table and should exit
+	id, err := strconv.Atoi(c.Param(("id")))
+	if err != nil {
+		h.HandleError(err, "Could not convert id\n", false)
+	}
+
+	go chord.FillEmptyEntries(self, id)
+
+	c.String(http.StatusOK, "Filled FingerTables")
+}
+
+func GetIdOnIp(c *gin.Context) {
+
+	c.String(http.StatusOK, strconv.Itoa(self.Id))
+}
+
+func EvictGossip(c *gin.Context) {
+	body, err := io.ReadAll(c.Request.Body)
+	if h.HandleError(err, "Can't read body", false) {
+		return
+	}
+	// Split the body into two strings.
+	bodyStrings := strings.Split(string(body), " ")
+	startAddress := bodyStrings[0]
+	startId, err := strconv.Atoi(bodyStrings[1])
+	if h.HandleError(err, "Can't convert id to int", false) {
+		return
+	}
+
+	id, err := strconv.Atoi(c.Param(("id"))) //node to remove
+	if err != nil {
+		h.HandleError(err, "Could not convert id\n", false)
+	}
+	chord.EvictGossip(id, startId, startAddress, self)
+	c.String(http.StatusOK, "Got Evict")
+}
+
+func FindPrevious(c *gin.Context) {
+	//finds the previous ndoe of a node that has crashed and shall be evicted
+
+	id, err := strconv.Atoi(c.Param(("id"))) //node of crashed, we want to find node that has this as succsessor
+	if h.HandleError(err, "Can't convert id to int", false) {
+		return
+	}
+
+	go chord.FindPrevious(id, self)
+	c.String(http.StatusOK, "Got FindPrevious")
+}
+
+func PingNeighbors() { //ping succsessor (if it exists) and predecessor
+	successor := self.FingerTable[0].NodeAddress
+	predecessor := self.Neighbours.Predecessor.Address
+	if successor != "" {
+		url := "http://" + successor + "/ping-node"
+		_, err, resp := h.GetRequest(url)
+		if err != nil {
+			h.HandleError(err, "Error on post request.", false)
+		}
+		if resp == http.StatusInternalServerError {
+			go chord.FindPrevious(self.FingerTable[0].NodeId, self)
+		}
+	}
+
+	if predecessor != "" {
+		url := "http://" + predecessor + "/ping-node"
+		_, err, resp := h.GetRequest(url)
+		if err != nil {
+			h.HandleError(err, "Error on post request.", false)
+		}
+		if resp == http.StatusInternalServerError {
+			go chord.FindPrevious(self.Neighbours.Predecessor.Id, self)
+		}
+	}
+
+	time.Sleep(4 * time.Second)
 }
 
 func Ping(c *gin.Context) {
@@ -343,10 +553,27 @@ func startServer() {
 	r.GET("/getFromChain", getFromChain)
 	r.GET("/node-id/:id", FindNodeId)
 	r.POST("/start", StartChordHandler)
+	r.GET("/storage/neighbors", GetNeighborHandler)
+	r.GET("/node-id/:id", FindNodeId)
+	r.GET("/fill-fingertable/:id", FillFingerTable)
+	r.GET("/getInfo", getInfo)
+	r.GET("/find-previous/:id", FindPrevious)
+
+	r.PUT("/update-previous-on-succsessor", UpdatePreviousOnsuccsessor)
+	r.PUT("/gossip", BalanceChord)
+
+	r.PUT("/evict-gossip/:id", EvictGossip)
+
+	r.POST("/leave", NodeLeave)
+	r.POST("/join", NodeJoin)
+	r.POST("/sim-crash", NodeCrash)
+	r.POST("/sim-recover", NodeRecover)
+	r.POST("/start", StartChordHandler)
+	r.POST("/rejoin-request", RejoinChord)
 
 	r.POST("/postToChain", postToChain)
 
-	// Run the server
+	// Run the r
 	if err := r.Run(":8080"); err != nil {
 		log.Fatal(err)
 	}
