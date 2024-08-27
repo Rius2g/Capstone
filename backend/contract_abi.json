@@ -1,0 +1,247 @@
+[
+    {
+      "inputs": [],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "encryptedData",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "owner",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "dataName",
+          "type": "string"
+        }
+      ],
+      "name": "PushEncryptedData",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "decryptionKey",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "owner",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "dataName",
+          "type": "string"
+        }
+      ],
+      "name": "PushPrivateKey",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "_encryptedData",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_decryptionKey",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_owner",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_dataName",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_releaseTime",
+          "type": "uint256"
+        }
+      ],
+      "name": "addStoredData",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "clearStoredData",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getLatestTimestamp",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "returnStoredData",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "encryptedData",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "decryptionKey",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "owner",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "dataName",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "id",
+              "type": "uint256"
+            },
+            {
+              "internalType": "int256",
+              "name": "phase",
+              "type": "int256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "releaseTime",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct TwoPhaseCommit.StoredData[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "index",
+          "type": "uint256"
+        }
+      ],
+      "name": "sendDecryptionKey",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "index",
+          "type": "uint256"
+        }
+      ],
+      "name": "sendEncryptedData",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "storedData",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "encryptedData",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "decryptionKey",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "owner",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "dataName",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "int256",
+          "name": "phase",
+          "type": "int256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "releaseTime",
+          "type": "uint256"
+        }
+      ],
+      "type": "function"
+    }
+  ]
+  
