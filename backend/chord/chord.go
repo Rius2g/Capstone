@@ -31,6 +31,8 @@ func CreateChord(self *h.Node) *h.Node {
 	return self
 }
 
+
+
 /*
 * Finds the neighbours of the current node.
 * @param self is the current node.
@@ -53,7 +55,10 @@ func InitNodeNew(selfAddress string) h.Node {
 	var FingerTable []h.FingerTableEntry
 	node := h.Node{FingerTable: FingerTable, Id: 0, Address: selfAddress, ChordSize: 0}
 	node.Neighbours = h.Neighbours{Predecessor: &node, Successor: &node}
-	node.RTTNeighbours = h.RTTNeighbours{ClosestRTTSuccsessor: h.RTTEntry{RTTNode: &node, RTTTime: math.MaxInt64}, RTTPredecessor: h.RTTEntry{RTTNode: &node, RTTTime: math.MaxInt64}}
+    node.SeedToReceiveFrom = h.RTTEntry{} 
+    node.Seeds = []string{}
+    node.Seed = false
+    node.NodesToSendTo = []h.RTTEntry{}
 	return node
 }
 
@@ -65,6 +70,7 @@ func UpdateNode(self *h.Node) h.Node {
 	Address_hash := sha1.Sum([]byte(self.Address))
 	self.Id = (h.HashToKey(Address_hash[:]) % self.ChordSize)
 	self.FingerTable = CreateFingerTable(self.ChordSize)
+    self = h.FillFingerTable(self)
 
 	return *self
 }
@@ -582,27 +588,7 @@ func RTT(Address string) int64 {
 	return RTT
 }
 
-func SetUpClosestRTT(self *h.Node, closestSuccsessor h.Node, RTT int) bool {
-	//Set up the closest node to the current node in terms of RTT
-	//how to determine the closest node in terms of RTT and be sure that every node has different "closest" nodes
-	if RTT > self.RTTNeighbours.ClosestRTTSuccsessor.RTTTime {
-		return false
-	}
-	if closestSuccsessor.Id != 0 && closestSuccsessor.Id != self.Id && &closestSuccsessor != self.Neighbours.Successor {
-		//need to send request to the switched out pred to tell it that it is no longer the closest node in terms of RTT
-		resp, err := http.Get(self.Neighbours.Predecessor.Address + "/RTTNeighbour/ClosestRTTSuccsessor/False")
-		if err != nil {
-			return false
-		}
-		defer resp.Body.Close()
 
-		self.RTTNeighbours.ClosestRTTSuccsessor.RTTTime = RTT
-		self.RTTNeighbours.ClosestRTTSuccsessor.RTTNode = &closestSuccsessor
-		return true
-	}
-
-	return false
-}
 
 func FindSuccessor(self *h.Node) h.Node {
 	// Find the successor of a node with a specific id
@@ -628,6 +614,54 @@ func GotData() {
 func GotDecryptionKey() {
 
 }
+
+func AttatchNodeToSeed(self *h.Node, node h.RTTEntry){
+
+    var bestRTT uint64 = math.MaxUint64
+    var index int = -1 
+    for i, attatchedNodes := range self.NodesToSendTo {  //iterate over and find the node that has highest RTT and replace that if lower RTT
+        if attatchedNodes.Address == node.Address {
+            return
+        }
+        if attatchedNodes.RTTTime < bestRTT {
+            bestRTT = attatchedNodes.RTTTime
+            index = i
+        }
+    }
+    if len(self.NodesToSendTo) < 3 {
+        self.NodesToSendTo = append(self.NodesToSendTo, node)
+    } else {
+        if index != -1 { //found a worse time, replace the worst node
+            //send request to the node to tell it to find new 
+            resp, err := http.Get("http://" + self.NodesToSendTo[index].Address + "/RemoveNodeFromSeed/" + self.Address)
+            if err != nil {
+                log.Fatalf("Error on get request\n Errormsg: %s", err)
+            }
+            defer resp.Body.Close()
+
+            self.NodesToSendTo[index] = node
+        }
+    }
+}
+
+func FindClosestSeed(self *h.Node, ExcludedSeed string) {
+    var bestRTT uint64 = math.MaxUint64
+    var bestSeed string
+    for _, seedAddress := range self.Seeds {
+        if seedAddress == ExcludedSeed { //skip the seed we were just removed from
+            continue
+        }
+        RTT := h.GetRTT(seedAddress)      
+        if RTT < bestRTT {
+            bestRTT = RTT
+            bestSeed = seedAddress  
+        }
+    }
+    self.SeedToReceiveFrom.Address = bestSeed 
+    self.SeedToReceiveFrom.RTTTime = bestRTT
+}
+
+
 
 func DetermineIfSeed() {
 

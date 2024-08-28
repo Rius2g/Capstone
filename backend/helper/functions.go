@@ -3,6 +3,7 @@ package helper
 import (
 	"bytes"
 	"fmt"
+    "time"
 	"io"
 	"log"
 	"math"
@@ -232,4 +233,18 @@ func PostRequest(url string) (string, error) {
 	response := string(body)
 
 	return response, err
+}
+
+
+func GetRTT(Address string) uint64 {
+    start := time.Now()
+    _, err := http.Get(Address)
+    if err != nil {
+        log.Printf("Error on get request\n Errormsg: %s", err)
+    }
+    stop := time.Now()
+    elapsed := stop.Sub(start).Milliseconds()
+    fmt.Println("RTT: ", elapsed)
+    
+    return uint64(elapsed)
 }

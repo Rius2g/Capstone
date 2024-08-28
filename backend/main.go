@@ -3,7 +3,6 @@ package main
 import (
 	chord "Backend/chord"
 	h "Backend/helper"
-	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -16,7 +15,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math"
 	"math/big"
 	"net/http"
 	"os"
@@ -145,144 +143,7 @@ func main() {
 	}
 }
 
-/*
-* Function to handle the RTT of the node
-* @param c: The context of the Request
-* @param predecessor: The predecessor of the nodes
-* @param RTT: The RTT of the nodes
- */
-func RTTPredecessor(c *gin.Context) {
-	var predecessor h.Node
-	err := c.BindJSON(&predecessor)
-	if err != nil {
-		fmt.Println("Could not bind the JSON")
-		return
-	}
 
-	RTT, err := strconv.ParseInt(c.Request.URL.Query().Get("RTT"), 10, 64)
-	if err != nil {
-		fmt.Println("Could not parse the RTT")
-		return
-	}
-
-	//Set up the closest node to the current node in terms of RTT
-	//how to determine the closest node in terms of RTT and be sure that every node has different "closest" nodes
-	if predecessor.Id == self.Id {
-		c.String(http.StatusOK, "Already predecessor")
-		return
-	}
-	if predecessor.Id == self.Neighbours.Predecessor.Id {
-		c.String(http.StatusOK, "Already predecessor")
-		return
-	}
-
-	if int(RTT) > self.RTTNeighbours.RTTPredecessor.RTTTime { //this means this node has a pre that is closer in terms of RTT
-		if predecessor.Id != self.Id { //have to check if the predecessor is not the current node or the same as the current node
-			c.String(http.StatusOK, "Already predecessor")
-		} else {
-			c.String(http.StatusOK, "Predecessor set successfully")
-		}
-	}
-	self.RTTNeighbours.RTTPredecessor.RTTNode = &predecessor
-	c.String(http.StatusOK, "Not set as predecessor")
-
-}
-
-func GetBestRTTAddress(RttTimes *[]int64, NodeAddresses *[]string) string {
-	// Find the best RTT time and the address of the node with the best RTT
-	var bestRTT int64 = math.MaxInt64
-	bestRTTAddress := ""
-
-	for i, rt := range *RttTimes {
-		if rt < bestRTT {
-			bestRTT = rt
-			bestRTTAddress = (*NodeAddresses)[i]
-		}
-	}
-
-	// Remove the best RTT from the list of RTTs and the address of the node with the best RTT
-	// This is to ensure that we do not keep on sending messages to the same node
-
-	// Find the index of the best RTT to remove it
-	for i, rt := range *RttTimes {
-		if rt == bestRTT {
-			// Remove the best RTT and corresponding address
-			*RttTimes = append((*RttTimes)[:i], (*RttTimes)[i+1:]...)
-			*NodeAddresses = append((*NodeAddresses)[:i], (*NodeAddresses)[i+1:]...)
-			break
-		}
-	}
-
-	return bestRTTAddress
-}
-
-/*
-* This is used to set a Seeds succsessor node for data broadcasting
-* Also used if a succsessor node gets a new pred
- */
-func NoLongerPredecessor(LastSuccessorAddress string, NodeAddresses []string) {
-	RttTimes := []int64{}
-	for _, address := range NodeAddresses {
-		if address == LastSuccessorAddress {
-			continue
-		}
-		rt := chord.RTT(address)
-		if rt == -1 {
-			fmt.Println("Could not ping the node")
-			continue
-		}
-		RttTimes = append(RttTimes, rt)
-	}
-
-	body, err := json.Marshal(self)
-	if err != nil {
-		fmt.Println("Could not marshal the body")
-		return
-	}
-
-	//now get the best RTT and the address and try over with different nodes until we get a successful response
-	for {
-		BestRttNode := GetBestRTTAddress(&RttTimes, &NodeAddresses)
-		postURL := BestRttNode + "/setPredecessor"
-		resp, err := http.Post(postURL, "application/json", bytes.NewBuffer(body))
-		if err != nil {
-			fmt.Println("Could not send the post request")
-			return
-		}
-		defer resp.Body.Close()
-
-		//read the response from the new successor
-		respBody, err := io.ReadAll(resp.Body)
-		if err != nil {
-			fmt.Println("Could not read the response")
-			return
-		}
-
-		fmt.Println(string(respBody)) //need to check if the response is successful, if it is then we can break out of the loop
-		if resp.StatusCode == 200 {
-			//check the resp body to see if the message is successful
-			if strings.Contains(string(respBody), "Pred set successfully") {
-				break
-			}
-		}
-	}
-
-}
-
-func NoLongerPredecessorHandler(c *gin.Context, LastSuccessorAddress string, NodeAddresses []string) {
-	NoLongerPredecessor(LastSuccessorAddress, NodeAddresses)
-	c.JSON(http.StatusOK, gin.H{"message": "New predecessor set successfully"})
-
-}
-
-func SetupRTTs(NodeAddresses []string) { //probably need more than 1 succsessor, have to do some math on this to see how many succsessors we need on seeds and also how many seeds, what is best for scalability?
-	//get a list of all the nodes in the network and ping them to get the RTT's
-	//this will be done by the seed nodes
-	//the seed nodes will then send the RTT's to the nodes in the network
-	//get all the nodes in the network to find the closest nodes in terms of RTT
-	//find the closest nodes in terms of RTT, send it a message to say this is the closest node in terms of RTT
-	NoLongerPredecessor(self.Address, NodeAddresses) //this is called to set the successor of this node
-}
 
 /*
 * Function to sned to the node we want to leave to make it leave
@@ -331,6 +192,11 @@ func getInfo(c *gin.Context) {
 
 	log.Printf("sending info from %d\n", self.Id)
 	c.String(http.StatusOK, strconv.Itoa(self.ChordSize))
+}
+
+
+func FindClosestSeedToReceiveFrom(c *gin.Context){
+//this function shall be called by non-seeds to find the closest seed in the network in terms of RTT to receive the data from
 }
 
 /*
@@ -534,6 +400,34 @@ func PingNeighbors() { //ping succsessor (if it exists) and predecessor
 	time.Sleep(4 * time.Second)
 }
 
+
+func AttatchNodeToSeed() { //called to attach this node to a seed that is close 
+    go chord.FindClosestSeed(self, "") 
+}
+
+
+func GetNodeAttatched(c *gin.Context) {
+    nodeAddress := c.Param("nodeAddress")
+    RTT, err := strconv.Atoi(c.Param("RTT"))
+    if err != nil {
+        log.Println("Error converting RTT to int")
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Error converting RTT to int"})
+        return
+    }
+
+    nodeEntry := h.RTTEntry{Address: nodeAddress, RTTTime: uint64(RTT)}
+    go chord.AttatchNodeToSeed(self, nodeEntry)
+
+    c.String(http.StatusOK, "Node attatched to seed")
+}
+
+func RemoveNodeFromSeed(c *gin.Context) {
+    address := c.Param("adress")
+    go chord.FindClosestSeed(self, address)
+    c.String(http.StatusOK, "Node removed from seed and found new one")
+}
+
+
 func Ping(c *gin.Context) {
 	// Get the RTT of the node
 	c.JSON(http.StatusOK, gin.H{})
@@ -548,7 +442,6 @@ func startServer() {
 	r.GET("/blockNumber", getBlockNumber)
 	r.GET("/ws", HandleWebSocket)
 	r.GET("get_locked_data", getLockedData)
-	r.GET("/RTTPredecessor", RTTPredecessor)
 	r.GET("/RTT", Ping)
 	r.GET("/getFromChain", getFromChain)
 	r.GET("/node-id/:id", FindNodeId)
@@ -558,6 +451,7 @@ func startServer() {
 	r.GET("/fill-fingertable/:id", FillFingerTable)
 	r.GET("/getInfo", getInfo)
 	r.GET("/find-previous/:id", FindPrevious)
+    r.GET("/RemoveNodeFromSeed:/adress", RemoveNodeFromSeed)
 
 	r.PUT("/update-previous-on-succsessor", UpdatePreviousOnsuccsessor)
 	r.PUT("/gossip", BalanceChord)

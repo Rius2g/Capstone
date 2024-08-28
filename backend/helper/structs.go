@@ -7,18 +7,16 @@ type Node struct {
     Address string
     FingerTable []FingerTableEntry //need this for effective joining of new nodes 
     Neighbours Neighbours
-    RTTNeighbours RTTNeighbours
+    SeedToReceiveFrom RTTEntry
+    Seeds []string //keep a list of the ip addresses of the seeds :) 
     Seed bool
+    NodesToSendTo []RTTEntry
 }
 
-type RTTNeighbours struct { //we can do this, since the RTT sending does not have to be a loop like the chord ring
-    ClosestRTTSuccsessor RTTEntry
-    RTTPredecessor RTTEntry
-}
 
 type RTTEntry struct {
-    RTTNode *Node
-    RTTTime int
+    Address string
+    RTTTime uint64
 }
 
 type FingerTableEntry struct {
