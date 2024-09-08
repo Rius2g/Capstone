@@ -1,15 +1,13 @@
 import { ethers } from "hardhat";
 import { expect } from "chai";
 import { TwoPhaseCommit } from "../typechain-types"; // Adjust this path if needed
-import { experimentalAddHardhatNetworkMessageTraceHook } from "hardhat/config";
 
 describe("TwoPhaseCommit", function () {
   let twoPhaseCommit: TwoPhaseCommit;
-  const interval = 3600; // 1 hour in seconds
 
   beforeEach(async function () {
     const TwoPhaseCommit = await ethers.getContractFactory("TwoPhaseCommit");
-    twoPhaseCommit = await TwoPhaseCommit.deploy(interval);
+    twoPhaseCommit = await TwoPhaseCommit.deploy();
     await twoPhaseCommit.waitForDeployment();
   });
 
@@ -32,7 +30,8 @@ describe("TwoPhaseCommit", function () {
       testData.decryptionKey,
       testData.owner,
       testData.dataName,
-      testData.releaseTime
+      testData.releaseTime,
+      "0x"
     );
 
     // Retrieve the stored data
@@ -75,7 +74,8 @@ describe("TwoPhaseCommit", function () {
         testData[0].decryptionKey,
         testData[0].owner,
         testData[0].dataName,
-        testData[0].releaseTime
+        testData[0].releaseTime,
+        "1x"
       );
 
       await twoPhaseCommit.addStoredData(
@@ -83,7 +83,8 @@ describe("TwoPhaseCommit", function () {
         testData[1].decryptionKey,
         testData[1].owner,
         testData[1].dataName,
-        testData[1].releaseTime
+        testData[1].releaseTime,
+        "2x"
       );
 
       await twoPhaseCommit.returnStoredData(); // Remove unused variable
@@ -110,7 +111,8 @@ describe("TwoPhaseCommit", function () {
       testData.decryptionKey,
       testData.owner,
       testData.dataName,
-      testData.releaseTime
+      testData.releaseTime,
+      "3x"
     );
 
     // Retrieve the stored data

@@ -47,7 +47,6 @@ contract TwoPhaseCommit {
 
     function addStoredData(string memory _encryptedData, string memory _decryptionKey, string memory _owner, string memory _dataName, uint256 _releaseTime, string memory _hash) public {
         storedData.push(StoredData(_encryptedData, _decryptionKey, _owner, _dataName, _hash, 0, _releaseTime));
-        index++;
     }
 
 
