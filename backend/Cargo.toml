@@ -1,6 +1,10 @@
 [package]
-name = "backend"
+name = "axum_server"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+axum = "0.6.18"
+tokio = { version = "1.28.2", features = ["full"] }
+hyper = { version = "0.14.26", features = ["full"] }
+tower = "0.4.13"
