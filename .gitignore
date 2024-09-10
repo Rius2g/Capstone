@@ -108,6 +108,8 @@ jspm_packages/
 # Optional npm cache directory
 .npm
 
+/backend/target/
+
 # Optional eslint cache
 .eslintcache
 
