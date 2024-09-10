@@ -8,3 +8,8 @@ axum = "0.6.18"
 tokio = { version = "1.28.2", features = ["full"] }
 hyper = { version = "0.14.26", features = ["full"] }
 tower = "0.4.13"
+web3 = "0.18.0"
+anyhow = "1.0.87"
+serde = "1.0.210"
+hex = "0.4.3"
+futures = "0.3.30"
