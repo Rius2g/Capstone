@@ -28,7 +28,7 @@ describe("TwoPhaseCommit", function () {
       decryptionKey: bytesKey, 
       owner: "Alice",
       dataName: "TestData",
-      releaseTime: Math.floor(Date.now() / 1000) + 86400, // 24 hours from now
+      releaseTime: Date.now()+ 86400, // 24 hours from now
       hash: hash
     };
 
@@ -65,7 +65,7 @@ describe("TwoPhaseCommit", function () {
         decryptionKey: ethers.toUtf8Bytes("SecretKey12"),
         owner: "Bob",
         dataName: "TestData2",
-        releaseTime: Math.floor(Date.now() / 1000) + 86400, // 24 hours from now
+        releaseTime: Date.now() + 86400, // 24 hours from now
         hash: ethers.keccak256(ethers.toUtf8Bytes("EncryptedHello"))
       },
       {
@@ -73,7 +73,7 @@ describe("TwoPhaseCommit", function () {
         decryptionKey: ethers.toUtf8Bytes("SecretKey123"),
         owner: "Alice",
         dataName: "TestData3",
-        releaseTime: Math.floor(Date.now() / 1000) + 86400, // 24 hours from now
+        releaseTime: Date.now() + 86400, // 24 hours from now
         hash: ethers.keccak256(ethers.toUtf8Bytes("EncryptedWorld"))
       }
     ];
@@ -153,7 +153,7 @@ describe("TwoPhaseCommit", function () {
       decryptionKey: ethers.toUtf8Bytes("SecretKey123"),
       owner: "Alice",
       dataName: "TestData",
-      releaseTime: currentTime - 86400, // 24 hours ago
+      releaseTime: currentTime + 60, // 24
       hash: ethers.keccak256(ethers.toUtf8Bytes("EncryptedHello"))
     };
 
@@ -170,6 +170,11 @@ describe("TwoPhaseCommit", function () {
     await expect(twoPhaseCommit.sendEncryptedData(0))
       .to.emit(twoPhaseCommit, "PushEncryptedData")
       .withArgs(ethers.hexlify(testData.encryptedData), testData.owner, testData.dataName, testData.hash);
+
+      //sleep 1 minute to release decryption key
+      //
+      await time.increaseTo(testData.releaseTime + 60);
+
 
     // Send decryption key
     await expect(twoPhaseCommit.sendDecryptionKey(0))
@@ -267,7 +272,38 @@ it("Should revert if dataname is empty", async function () {
   });
 
 
+ 
 
+  it("Should return the 'public' data from the blockchain when querying for dataname + owner", async function () {
+  const testData = {
+    encryptedData: ethers.toUtf8Bytes("EncryptedHello"),
+    decryptionKey: ethers.toUtf8Bytes("SecretKey123"),
+    owner: "Alice",
+    dataName: "TestData",
+    releaseTime: Date.now() + 86400, // 24 hours from now, in seconds
+    hash: ethers.keccak256(ethers.toUtf8Bytes("EncryptedHello"))
+  };
+
+  // Add the stored data 
+  await twoPhaseCommit.addStoredData(
+    testData.encryptedData,
+    testData.decryptionKey,
+    testData.owner,
+    testData.dataName,
+    testData.releaseTime,
+    testData.hash
+  );
+
+  // Retrieve the stored data from the "get public data" function 
+  const storedData = await twoPhaseCommit.GetPublicData(testData.dataName, testData.owner); 
+
+  // Check the returned data
+  expect(ethers.hexlify(storedData[0])).to.equal(ethers.hexlify(testData.encryptedData));
+  expect(ethers.hexlify(storedData[1])).to.equal(ethers.hexlify(testData.hash));
+  expect(storedData[2]).to.equal(testData.owner);
+  expect(storedData[3]).to.equal(testData.dataName);
+  expect(storedData[4]).to.equal(BigInt(testData.releaseTime));
+});
 
   afterEach(async function () {
     await twoPhaseCommit.clearStoredData();
