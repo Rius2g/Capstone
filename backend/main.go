@@ -12,6 +12,7 @@ import (
     "strings"
     "time"
     h "web3server/helper"
+    t "web3server/testing"
     "github.com/ethereum/go-ethereum/common/hexutil"
     "github.com/ethereum/go-ethereum"
     "github.com/ethereum/go-ethereum/accounts/abi"
@@ -27,6 +28,35 @@ import (
 type Contract struct {
     ABI json.RawMessage `json:"abi"`
 }
+
+// Event structs to match contract events
+type ReleaseEncryptedDataEvent struct {
+    EncryptedData []byte
+    Owner         string
+    DataName      string
+    ReleaseTime   *big.Int
+    Hash          []byte
+}
+
+type KeyReleasedEvent struct {
+    PrivateKey []byte
+    Owner      string
+    DataName   string
+}
+
+type KeyReleaseRequestedEvent struct {
+    Index    *big.Int
+    Owner    string
+    DataName string
+}
+
+var (
+    client          *ethclient.Client
+    contractAddress common.Address
+    contractABI     abi.ABI
+    PrivateKey      string
+    distributor     *t.DistributedTester
+)
 
 func LoadABI() (abi.ABI, error) {
     filePath := "TwoPhaseCommit.json"
@@ -49,11 +79,6 @@ func LoadABI() (abi.ABI, error) {
     return parsedABI, nil
 }
 
-var client *ethclient.Client
-var contractAddress common.Address
-var contractABI abi.ABI
-var PrivateKey string
-
 func main() {
     if err := godotenv.Load(); err != nil {
         log.Fatalf("Error loading .env file")
@@ -67,26 +92,87 @@ func main() {
     }
     defer client.Close()
 
-    blockNumber, err := client.BlockNumber(context.Background())
-    if err != nil {
-        log.Fatalf("Failed to get the latest block number: %v", err)
-    }
-    fmt.Printf("Latest block number: %d\n", blockNumber)
-
-    contractAddress = common.HexToAddress("0xA7F043397395F9d16782E6FC5c502AB5643078b3")
+    contractAddress = common.HexToAddress("0xEA0243082093B09858b37f08d30531a29cA6589b")
     contractABI, err = LoadABI()
     if err != nil {
         log.Fatalf("Failed to parse contract ABI: %v", err)
     }
 
+    // Set up distributed testing configuration
+    testConfig := t.TestConfig{
+        NetworkEndpoint: "wss://api.avax-test.network/ext/bc/C/ws",
+        ContractAddress: contractAddress,
+        ContractABI:     contractABI,
+        NetworkConditions: []t.NetworkCondition{
+            {
+                BaseLatency: 100 * time.Millisecond,
+                Jitter:     50 * time.Millisecond,
+                PacketLoss: 0.01, // 1% packet loss
+            },
+            {
+                BaseLatency: 200 * time.Millisecond,
+                Jitter:     100 * time.Millisecond,
+                PacketLoss: 0.05, // 5% packet loss
+            },
+            {
+                BaseLatency: 500 * time.Millisecond,
+                Jitter:     200 * time.Millisecond,
+                PacketLoss: 0.1, // 10% packet loss
+            },
+        },
+    }
+
+    // Initialize distributed tester
+    distributor, err = t.NewDistributedTester(testConfig)
+    if err != nil {
+        log.Fatalf("Failed to initialize distributed tester: %v", err)
+    }
+    defer distributor.Close()
+
+    // Start monitoring events across all test nodes
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()
+
+    if err := distributor.StartEventMonitoring(ctx); err != nil {
+        log.Fatalf("Failed to start event monitoring: %v", err)
+    }
+
+    // Start the regular Web3 listener
     go Web3Listener()
 
     router := gin.Default()
     router.POST("/upload", postData)
     router.GET("/get/:dataname/:owner", getData)
+    router.GET("/stats", getTestingStats)
 
     fmt.Println("Server is running on port 8080")
     router.Run(":8080")
+}
+
+func getTestingStats(c *gin.Context) {
+    stats := distributor.GetEventStats()
+    
+    formattedStats := make(map[string]map[string]interface{})
+    
+    for txHash, stat := range stats {
+        formattedStats[txHash] = map[string]interface{}{
+            "first_node":        stat.FirstNode,
+            "last_node":         stat.LastNode,
+            "time_difference_ms": stat.TimeDiff.Milliseconds(),
+            "node_timings":      formatTimings(stat.NodeTimings),
+            "event_data":        stat.EventData,
+        }
+    }
+    
+    c.JSON(200, formattedStats)
+}
+
+func formatTimings(timings map[int]time.Time) map[string]string {
+    formatted := make(map[string]string)
+    for nodeID, timing := range timings {
+        formatted[fmt.Sprintf("node_%d", nodeID)] = timing.Format(time.RFC3339Nano)
+    }
+    return formatted
 }
 
 func postData(c *gin.Context) {
@@ -95,11 +181,15 @@ func postData(c *gin.Context) {
     dataName := c.PostForm("dataname")
     releaseTime := c.PostForm("releaseTime")
 
-    encryptedData, privKey, err := h.EncryptData(data)
+    // Encrypt the data first
+    encryptedData, _, err := h.EncryptData(data)
     if err != nil {
         c.JSON(400, gin.H{"error": fmt.Sprintf("Failed to encrypt data: %v", err)})
         return
     }
+
+    // Calculate hash from the encrypted data
+    hash := sha256.Sum256(encryptedData)
 
     ReleaseTime, err := strconv.ParseUint(releaseTime, 10, 64)
     if err != nil {
@@ -107,7 +197,23 @@ func postData(c *gin.Context) {
         return
     }
 
-    hash := sha256.Sum256([]byte(data + owner))
+    // Validate input parameters
+    if len(encryptedData) == 0 {
+        c.JSON(400, gin.H{"error": "Encrypted data cannot be empty"})
+        return
+    }
+    if len(owner) == 0 {
+        c.JSON(400, gin.H{"error": "Owner cannot be empty"})
+        return
+    }
+    if len(dataName) == 0 {
+        c.JSON(400, gin.H{"error": "Data name cannot be empty"})
+        return
+    }
+    if ReleaseTime <= uint64(time.Now().Unix()) {
+        c.JSON(400, gin.H{"error": "Release time must be in the future"})
+        return
+    }
 
     privateKey, err := crypto.HexToECDSA(strings.TrimPrefix(PrivateKey, "0x"))
     if err != nil {
@@ -121,7 +227,13 @@ func postData(c *gin.Context) {
         return
     }
 
-    input, err := contractABI.Pack("addStoredData", encryptedData, privKey, owner, dataName, big.NewInt(int64(ReleaseTime)), hash[:])
+    input, err := contractABI.Pack("addStoredData", 
+        encryptedData,
+        owner,
+        dataName,
+        big.NewInt(int64(ReleaseTime)),
+        hash[:],
+    )
     if err != nil {
         c.JSON(500, gin.H{"error": fmt.Sprintf("Failed to pack transaction data: %v", err)})
         return
@@ -204,38 +316,26 @@ func getData(c *gin.Context) {
 
     var result struct {
         EncryptedData []byte
-        Hash          [32]byte
+        Hash          []byte
         Owner         string
         DataName      string
         ReleaseTime   *big.Int
+        KeyReleased   bool
     }
 
-    tupleBytes := output
-
-    encryptedDataOffset := new(big.Int).SetBytes(tupleBytes[:32]).Uint64()
-    encryptedDataLength := new(big.Int).SetBytes(tupleBytes[encryptedDataOffset:encryptedDataOffset+32]).Uint64()
-    result.EncryptedData = tupleBytes[encryptedDataOffset+32 : encryptedDataOffset+32+encryptedDataLength]
-
-    copy(result.Hash[:], tupleBytes[32:64])
-
-    ownerOffset := new(big.Int).SetBytes(tupleBytes[64:96]).Uint64()
-    ownerLength := new(big.Int).SetBytes(tupleBytes[ownerOffset:ownerOffset+32]).Uint64()
-    result.Owner = string(tupleBytes[ownerOffset+32 : ownerOffset+32+ownerLength])
-
-    dataNameOffset := new(big.Int).SetBytes(tupleBytes[96:128]).Uint64()
-    dataNameLength := new(big.Int).SetBytes(tupleBytes[dataNameOffset:dataNameOffset+32]).Uint64()
-    result.DataName = string(tupleBytes[dataNameOffset+32 : dataNameOffset+32+dataNameLength])
-
-    result.ReleaseTime = new(big.Int).SetBytes(tupleBytes[128:160])
-
-    fmt.Printf("Manually decoded result: %+v\n", result)
+    err = contractABI.UnpackIntoInterface(&result, "GetPublicData", output)
+    if err != nil {
+        c.JSON(500, gin.H{"error": fmt.Sprintf("Failed to unpack output: %v", err)})
+        return
+    }
 
     response := gin.H{
         "encryptedData": hexutil.Encode(result.EncryptedData),
-        "hash":          hexutil.Encode(result.Hash[:]),
+        "hash":          hexutil.Encode(result.Hash),
         "owner":         result.Owner,
         "dataName":      result.DataName,
         "releaseTime":   result.ReleaseTime.String(),
+        "keyReleased":   result.KeyReleased,
     }
 
     c.JSON(200, response)
@@ -270,27 +370,61 @@ func Web3Listener() {
 
 func handleLog(vLog types.Log) {
     switch vLog.Topics[0].Hex() {
-    case contractABI.Events["PushEncryptedData"].ID.Hex():
-        HandlePushEncryptedDataEvent(vLog)
-    case contractABI.Events["PushPrivateKey"].ID.Hex():
-        HandlePushPrivateKeyEvent(vLog)
+    case contractABI.Events["ReleaseEncryptedData"].ID.Hex():
+        HandleReleaseEncryptedDataEvent(vLog)
+    case contractABI.Events["KeyReleased"].ID.Hex():
+        HandleKeyReleasedEvent(vLog)
+    case contractABI.Events["KeyReleaseRequested"].ID.Hex():
+        HandleKeyReleaseRequestedEvent(vLog)
     default:
         log.Println("Unknown event:", vLog.Topics[0].Hex())
     }
 }
 
-func HandlePushEncryptedDataEvent(vLog types.Log) {
-    var Event h.PushEncrytedDataEvent
+func HandleReleaseEncryptedDataEvent(vLog types.Log) {
+    var event ReleaseEncryptedDataEvent
 
-    err := contractABI.UnpackIntoInterface(&Event, "PushEncryptedData", vLog.Data)
+    err := contractABI.UnpackIntoInterface(&event, "ReleaseEncryptedData", vLog.Data)
     if err != nil {
-        log.Fatalf("Failed to unpack event: %v", err)
+        log.Printf("Failed to unpack ReleaseEncryptedData event: %v", err)
+        return
     }
 
-    fmt.Println("Encrypted Data: ", Event.EncryptedData)
-    fmt.Println("Owner: ", Event.Owner)
-    fmt.Println("Data Name: ", Event.DataName)
-    fmt.Println("Hash: ", Event.Hash)
+    fmt.Println("Encrypted Data: ", hexutil.Encode(event.EncryptedData))
+    fmt.Println("Owner: ", event.Owner)
+    fmt.Println("Data Name: ", event.DataName)
+    fmt.Println("Release Time: ", event.ReleaseTime)
+    fmt.Println("Hash: ", hexutil.Encode(event.Hash))
+}
+
+
+func HandleKeyReleasedEvent(vLog types.Log) {
+    var event KeyReleasedEvent
+
+    err := contractABI.UnpackIntoInterface(&event, "KeyReleased", vLog.Data)
+    if err != nil {
+        log.Printf("Failed to unpack KeyReleased event: %v", err)
+        return
+    }
+
+    fmt.Println("Private Key: ", hexutil.Encode(event.PrivateKey))
+    fmt.Println("Owner: ", event.Owner)
+    fmt.Println("Data Name: ", event.DataName)
+}
+
+
+func HandleKeyReleaseRequestedEvent(vLog types.Log) {
+    var event KeyReleaseRequestedEvent
+
+    err := contractABI.UnpackIntoInterface(&event, "KeyReleaseRequested", vLog.Data)
+    if err != nil {
+        log.Printf("Failed to unpack KeyReleaseRequested event: %v", err)
+        return
+    }
+
+    fmt.Println("Index: ", event.Index)
+    fmt.Println("Owner: ", event.Owner)
+    fmt.Println("Data Name: ", event.DataName)
 }
 
 func HandlePushPrivateKeyEvent(vLog types.Log) {

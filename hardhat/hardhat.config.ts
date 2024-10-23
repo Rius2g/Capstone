@@ -1,6 +1,10 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import * as dotenv from "dotenv";
+import "@nomicfoundation/hardhat-toolbox";
+// or individually:
+import "@nomicfoundation/hardhat-ethers";
+import "@typechain/hardhat";
 
 dotenv.config(); // Load environment variables
 

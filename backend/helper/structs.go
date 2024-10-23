@@ -11,7 +11,6 @@ type PublishData struct {
     Owner string `json:"owner"`
     ReleaseTime uint64 `json:"releaseTime"`
     Hash []byte `json:"hash"`
-    PrivateKey []byte `json:"privateKey"`
 }
 
 
@@ -39,4 +38,24 @@ type PublicData struct {
     ReleaseTime *big.Int `json:"releaseTime"`
     Hash [32]byte `json:"hash"`
     DataName string `json:"dataName"`
+}
+
+type ReleaseEncryptedDataEvent struct {
+    EncryptedData []byte
+    Owner         string
+    DataName      string
+    ReleaseTime   *big.Int
+    Hash          []byte
+}
+
+type KeyReleasedEvent struct {
+    PrivateKey []byte
+    Owner      string
+    DataName   string
+}
+
+type KeyReleaseRequestedEvent struct {
+    Index    *big.Int
+    Owner    string
+    DataName string
 }
