@@ -20,6 +20,7 @@ type PushEncrytedDataEvent struct {
     Owner string `json:"owner"`
     DataName string `json:"dataName"`
     Hash []byte `json:"hash"`
+    ReleaseTime *big.Int `json:"releaseTime"`
 }
 
 

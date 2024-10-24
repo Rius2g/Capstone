@@ -6,21 +6,23 @@ import (
     "encoding/json"
     "fmt"
     "log"
-    "os"
     "math/big"
+    "os"
     "strconv"
     "strings"
     "time"
+
     h "web3server/helper"
     t "web3server/testing"
-    "github.com/ethereum/go-ethereum/common/hexutil"
+
     "github.com/ethereum/go-ethereum"
     "github.com/ethereum/go-ethereum/accounts/abi"
     "github.com/ethereum/go-ethereum/accounts/abi/bind"
+    "github.com/ethereum/go-ethereum/common"
+    "github.com/ethereum/go-ethereum/common/hexutil"
+    "github.com/ethereum/go-ethereum/core/types"
     "github.com/ethereum/go-ethereum/crypto"
     "github.com/ethereum/go-ethereum/ethclient"
-    "github.com/ethereum/go-ethereum/core/types"
-    "github.com/ethereum/go-ethereum/common"
     "github.com/gin-gonic/gin"
     "github.com/joho/godotenv"
 )
@@ -45,7 +47,6 @@ type KeyReleasedEvent struct {
 }
 
 type KeyReleaseRequestedEvent struct {
-    Index    *big.Int
     Owner    string
     DataName string
 }
@@ -56,6 +57,8 @@ var (
     contractABI     abi.ABI
     PrivateKey      string
     distributor     *t.DistributedTester
+    privKeys        map[string][]byte
+    encryptedData   map[string][]byte
 )
 
 func LoadABI() (abi.ABI, error) {
@@ -98,6 +101,9 @@ func main() {
         log.Fatalf("Failed to parse contract ABI: %v", err)
     }
 
+    privKeys = make(map[string][]byte)
+    encryptedData = make(map[string][]byte)
+
     // Set up distributed testing configuration
     testConfig := t.TestConfig{
         NetworkEndpoint: "wss://api.avax-test.network/ext/bc/C/ws",
@@ -106,18 +112,18 @@ func main() {
         NetworkConditions: []t.NetworkCondition{
             {
                 BaseLatency: 100 * time.Millisecond,
-                Jitter:     50 * time.Millisecond,
-                PacketLoss: 0.01, // 1% packet loss
+                Jitter:      50 * time.Millisecond,
+                PacketLoss:  0.01, // 1% packet loss
             },
             {
                 BaseLatency: 200 * time.Millisecond,
-                Jitter:     100 * time.Millisecond,
-                PacketLoss: 0.05, // 5% packet loss
+                Jitter:      100 * time.Millisecond,
+                PacketLoss:  0.05, // 5% packet loss
             },
             {
                 BaseLatency: 500 * time.Millisecond,
-                Jitter:     200 * time.Millisecond,
-                PacketLoss: 0.1, // 10% packet loss
+                Jitter:      200 * time.Millisecond,
+                PacketLoss:  0.1, // 10% packet loss
             },
         },
     }
@@ -137,8 +143,8 @@ func main() {
         log.Fatalf("Failed to start event monitoring: %v", err)
     }
 
-    // Start the regular Web3 listener
-    go Web3Listener()
+    // Remove the separate Web3Listener
+    // go Web3Listener()
 
     router := gin.Default()
     router.POST("/upload", postData)
@@ -151,19 +157,19 @@ func main() {
 
 func getTestingStats(c *gin.Context) {
     stats := distributor.GetEventStats()
-    
+
     formattedStats := make(map[string]map[string]interface{})
-    
+
     for txHash, stat := range stats {
         formattedStats[txHash] = map[string]interface{}{
-            "first_node":        stat.FirstNode,
-            "last_node":         stat.LastNode,
+            "first_node":         stat.FirstNode,
+            "last_node":          stat.LastNode,
             "time_difference_ms": stat.TimeDiff.Milliseconds(),
-            "node_timings":      formatTimings(stat.NodeTimings),
-            "event_data":        stat.EventData,
+            "node_timings":       formatTimings(stat.NodeTimings),
+            "event_data":         stat.EventData,
         }
     }
-    
+
     c.JSON(200, formattedStats)
 }
 
@@ -182,11 +188,13 @@ func postData(c *gin.Context) {
     releaseTime := c.PostForm("releaseTime")
 
     // Encrypt the data first
-    encryptedData, _, err := h.EncryptData(data)
+    encryptedData, privKey, err := h.EncryptData(data)
     if err != nil {
         c.JSON(400, gin.H{"error": fmt.Sprintf("Failed to encrypt data: %v", err)})
         return
     }
+
+    privKeys[dataName] = privKey
 
     // Calculate hash from the encrypted data
     hash := sha256.Sum256(encryptedData)
@@ -227,7 +235,7 @@ func postData(c *gin.Context) {
         return
     }
 
-    input, err := contractABI.Pack("addStoredData", 
+    input, err := contractABI.Pack("addStoredData",
         encryptedData,
         owner,
         dataName,
@@ -341,105 +349,31 @@ func getData(c *gin.Context) {
     c.JSON(200, response)
 }
 
+// Remove the Web3Listener function
+/*
 func Web3Listener() {
-    query := ethereum.FilterQuery{
-        Addresses: []common.Address{contractAddress},
-    }
-
-    logs := make(chan types.Log)
-    sub, err := client.SubscribeFilterLogs(context.Background(), query, logs)
-    if err != nil {
-        log.Fatalf("Failed to subscribe to logs: %v", err)
-    }
-    defer sub.Unsubscribe()
-
-    for {
-        select {
-        case err := <-sub.Err():
-            log.Printf("Subscription error: %v", err)
-            time.Sleep(5 * time.Second)
-            sub, err = client.SubscribeFilterLogs(context.Background(), query, logs)
-            if err != nil {
-                log.Printf("Failed to resubscribe to logs: %v", err)
-            }
-        case vLog := <-logs:
-            handleLog(vLog)
-        }
-    }
+    // ... (existing code)
 }
+*/
 
+// Remove the handleLog and event handlers, as they should be handled by the DistributedTester
+/*
 func handleLog(vLog types.Log) {
-    switch vLog.Topics[0].Hex() {
-    case contractABI.Events["ReleaseEncryptedData"].ID.Hex():
-        HandleReleaseEncryptedDataEvent(vLog)
-    case contractABI.Events["KeyReleased"].ID.Hex():
-        HandleKeyReleasedEvent(vLog)
-    case contractABI.Events["KeyReleaseRequested"].ID.Hex():
-        HandleKeyReleaseRequestedEvent(vLog)
-    default:
-        log.Println("Unknown event:", vLog.Topics[0].Hex())
-    }
+    // ... (existing code)
 }
 
 func HandleReleaseEncryptedDataEvent(vLog types.Log) {
-    var event ReleaseEncryptedDataEvent
-
-    err := contractABI.UnpackIntoInterface(&event, "ReleaseEncryptedData", vLog.Data)
-    if err != nil {
-        log.Printf("Failed to unpack ReleaseEncryptedData event: %v", err)
-        return
-    }
-
-    fmt.Println("Encrypted Data: ", hexutil.Encode(event.EncryptedData))
-    fmt.Println("Owner: ", event.Owner)
-    fmt.Println("Data Name: ", event.DataName)
-    fmt.Println("Release Time: ", event.ReleaseTime)
-    fmt.Println("Hash: ", hexutil.Encode(event.Hash))
+    // ... (existing code)
 }
-
 
 func HandleKeyReleasedEvent(vLog types.Log) {
-    var event KeyReleasedEvent
-
-    err := contractABI.UnpackIntoInterface(&event, "KeyReleased", vLog.Data)
-    if err != nil {
-        log.Printf("Failed to unpack KeyReleased event: %v", err)
-        return
-    }
-
-    fmt.Println("Private Key: ", hexutil.Encode(event.PrivateKey))
-    fmt.Println("Owner: ", event.Owner)
-    fmt.Println("Data Name: ", event.DataName)
+    // ... (existing code)
 }
-
 
 func HandleKeyReleaseRequestedEvent(vLog types.Log) {
-    var event KeyReleaseRequestedEvent
-
-    err := contractABI.UnpackIntoInterface(&event, "KeyReleaseRequested", vLog.Data)
-    if err != nil {
-        log.Printf("Failed to unpack KeyReleaseRequested event: %v", err)
-        return
-    }
-
-    fmt.Println("Index: ", event.Index)
-    fmt.Println("Owner: ", event.Owner)
-    fmt.Println("Data Name: ", event.DataName)
+    // ... (existing code)
 }
-
-func HandlePushPrivateKeyEvent(vLog types.Log) {
-    var Event h.PushPrivateKeyEvent
-
-    err := contractABI.UnpackIntoInterface(&Event, "PushPrivateKey", vLog.Data)
-    if err != nil {
-        log.Fatalf("Failed to unpack event: %v", err)
-    }
-
-    fmt.Println("Decryption Key: ", Event.DecryptionKey)
-    fmt.Println("Owner: ", Event.Owner)
-    fmt.Println("Data Name: ", Event.DataName)
-    fmt.Println("Hash: ", Event.Hash)
-}
+*/
 
 func MustGetEnv(key string) string {
     value := os.Getenv(key)
@@ -448,3 +382,4 @@ func MustGetEnv(key string) string {
     }
     return value
 }
+

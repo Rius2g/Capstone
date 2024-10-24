@@ -8,6 +8,7 @@ import (
     "os"
     "sync"
     "time"
+    "math"
     h "web3server/helper"
     "github.com/ethereum/go-ethereum"
     "github.com/ethereum/go-ethereum/accounts/abi"
@@ -78,22 +79,49 @@ func NewDistributedTester(config TestConfig) (*DistributedTester, error) {
     }, nil
 }
 
-// simulateNetworkConditions adds artificial delay and packet loss
 func (n *TestNode) simulateNetworkConditions() {
-    // Simulate network latency
-    baseDelay := n.NetworkCondition.BaseLatency
-    jitter := time.Duration(rand.Int63n(int64(n.NetworkCondition.Jitter)))
-    totalDelay := baseDelay + jitter
-
-    // Simulate packet loss
-    if rand.Float64() < n.NetworkCondition.PacketLoss {
-        // Simulate packet loss by adding substantial delay
-        totalDelay += 5 * time.Second
-        n.logger.Printf("Simulated packet loss, adding 5s delay")
+    // Use more realistic network simulation with exponential distribution
+    randExp := rand.ExpFloat64()
+    
+    // Base latency with exponential variation
+    baseDelay := float64(n.NetworkCondition.BaseLatency)
+    jitterRange := float64(n.NetworkCondition.Jitter)
+    
+    // Calculate total delay using exponential distribution
+    // This creates more realistic network behavior
+    latencyMultiplier := math.Max(0.1, randExp)
+    totalDelay := time.Duration(baseDelay * latencyMultiplier)
+    
+    // Add jitter with normal distribution
+    jitter := time.Duration(rand.NormFloat64() * float64(jitterRange))
+    totalDelay += jitter
+    
+    // Ensure minimum delay
+    if totalDelay < time.Millisecond {
+        totalDelay = time.Millisecond
     }
-
+    
+    // Simulate network congestion (random spikes)
+    if rand.Float64() < 0.05 { // 5% chance of congestion
+        congestionMultiplier := 1.0 + (rand.Float64() * 4.0) // 1x to 5x slowdown
+        totalDelay = time.Duration(float64(totalDelay) * congestionMultiplier)
+    }
+    
+    // Simulate packet loss with exponential backoff
+    maxRetries := 3
+    for retry := 0; retry < maxRetries; retry++ {
+        if rand.Float64() < n.NetworkCondition.PacketLoss {
+            backoffDelay := time.Duration(math.Pow(2, float64(retry))) * time.Second
+            totalDelay += backoffDelay
+            n.logger.Printf("Packet loss occurred, retry %d, adding %v delay", retry+1, backoffDelay)
+        } else {
+            break
+        }
+    }
+    
     time.Sleep(totalDelay)
 }
+
 
 // StartEventMonitoring starts monitoring events across all nodes
 func (dt *DistributedTester) StartEventMonitoring(ctx context.Context) error {
@@ -159,29 +187,40 @@ func (n *TestNode) handleLog(vLog types.Log) {
     n.EventTimes[txHash] = receiveTime
     
     switch vLog.Topics[0].Hex() {
-    case n.ContractABI.Events["PushEncryptedData"].ID.Hex():
+    case n.ContractABI.Events["ReleaseEncryptedData"].ID.Hex():
         var event h.PushEncrytedDataEvent
-        err := n.ContractABI.UnpackIntoInterface(&event, "PushEncryptedData", vLog.Data)
+        err := n.ContractABI.UnpackIntoInterface(&event, "ReleaseEncryptedData", vLog.Data)
         if err != nil {
-            n.logger.Printf("Failed to unpack PushEncryptedData event: %v", err)
+            n.logger.Printf("Failed to unpack ReleaseEncryptedData event: %v", err)
             return
         }
         n.EventData[txHash] = event
-        n.logger.Printf("Received PushEncryptedData event\nOwner: %s\nDataName: %s",
+        n.logger.Printf("Received RealseEncryptedData event\nOwner: %s\nDataName: %s",
             event.Owner,
             event.DataName)
             
-    case n.ContractABI.Events["PushPrivateKey"].ID.Hex():
-        var event h.PushPrivateKeyEvent
-        err := n.ContractABI.UnpackIntoInterface(&event, "PushPrivateKey", vLog.Data)
+    case n.ContractABI.Events["KeyReleased"].ID.Hex():
+        var event h.KeyReleasedEvent
+        err := n.ContractABI.UnpackIntoInterface(&event, "KeyReleased", vLog.Data)
         if err != nil {
-            n.logger.Printf("Failed to unpack PushPrivateKey event: %v", err)
+            n.logger.Printf("Failed to unpack KeyReleased event: %v", err)
             return
         }
         n.EventData[txHash] = event
-        n.logger.Printf("Received PushPrivateKey event\nOwner: %s\nDataName: %s",
+        n.logger.Printf("Received KeyReleased event\nOwner: %s\nDataName: %s",
             event.Owner,
             event.DataName)
+    case n.ContractABI.Events["KeyReleaseRequested"].ID.Hex():
+        var event h.KeyReleaseRequestedEvent
+        err := n.ContractABI.UnpackIntoInterface(&event, "KeyReleaseRequested", vLog.Data)
+        if err != nil {
+            n.logger.Printf("Failed to unpack KeyReleaseRequested event: %v", err)
+            return
+        }
+        n.EventData[txHash] = event
+        n.logger.Printf("Received KeyReleaseRequested event\nOwner: %s\nDataName: %s",
+        event.Owner,
+        event.DataName)
     }
 }
 
